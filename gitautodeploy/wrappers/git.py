@@ -113,6 +113,7 @@ class GitWrapper():
 
         commands = []
         commands.append('unset GIT_DIR')
+        commands.append('export GIT_SSH_COMMAND="$((which ssh)) -o StrictHostKeyChecking=yes"')
         commands.append('git clone --recursive ' + repo_config['url'] + ' -b ' + repo_config['branch'] + ' ' + repo_config['path'])
 
         # All commands need to success
