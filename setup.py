@@ -21,16 +21,18 @@ package_path = os.path.join(os.path.dirname(os.path.realpath(__file__)), "gitaut
 wwwroot_files = package_files(package_path, "wwwroot")
 data_files = package_files(package_path, "data")
 
+print("find_packages() said.....", find_packages())
+
 setup(name='git-auto-deploy',
       version='0.17',
       url='https://github.com/olipo186/Git-Auto-Deploy',
       author='Oliver Poignant',
       author_email='oliver@poignant.se',
-      packages=find_packages(),
+      packages=find_packages() + ['gitautodeploy', 'gitautodeploy.command'],
       package_data={'gitautodeploy': data_files + wwwroot_files},
       entry_points={
           'console_scripts': [
-              'git-auto-deploy = gitautodeploy.__main__:main'
+              'git-auto-deploy = gitautodeploy.command:main'
           ]
       },
       install_requires=[
