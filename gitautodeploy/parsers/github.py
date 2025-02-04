@@ -42,22 +42,25 @@ class GitHubRequestParser(WebhookRequestParserBase):
 
         for repo_config in repo_configs:
 
-            if "secret-token" in repo_config:
-                if "x-hub-signature" not in request_headers:
-                    action.log_info(
-                        f"Request signature is missing for repository {repo_config["url"]}."
-                    )
-                    return False
-                if not self.verify_signature(
-                    repo_config["secret-token"],
-                    request_body,
-                    request_headers["x-hub-signature"],
-                ):
-                    action.log_info(
-                        f"Request signature does not match the 'secret-token' "
-                        f"configured for repository {repo_config["url"]}."
-                    )
-                    return False
+            if "secret-token" not in repo_config:
+                continue
+            if "x-hub-signature" not in request_headers:
+                action.log_info(
+                    f"Request signature is missing for repository {repo_config["url"]}."
+                )
+                return False
+            signature_valid = self.verify_signature(
+                repo_config["secret-token"],
+                request_body,
+                request_headers["x-hub-signature"],
+            )
+            action.log_info(f"Signature is {"valid" if signature_valid else "invalid"}")
+            if not signature_valid:
+                action.log_info(
+                    f"Request signature does not match the 'secret-token' "
+                    f"configured for repository {repo_config["url"]}."
+                )
+                return False
 
         return True
 
