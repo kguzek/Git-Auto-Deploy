@@ -527,13 +527,13 @@ class GitAutoDeploy:
             # Serve forever (until reactor.stop())
             reactor.run(installSignalHandlers=False)
 
-        except BindError as e:
-            self._startup_event.log_critical(f"Unable to start web socket server: {e}")
-
         except ImportError:
             self._startup_event.log_error(
                 "Unable to start web socket server due to missing dependency."
             )
+
+        except BindError as e:
+            self._startup_event.log_critical(f"Unable to start web socket server: {e}")
 
         event = SystemEvent()
         self._event_store.register_action(event)
