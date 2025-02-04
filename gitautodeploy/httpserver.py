@@ -366,7 +366,7 @@ def webhook_request_handler_factory(config, event_store, server_status, is_https
                 f"{self._config["web-ui-username"]}:{self._config["web-ui-password"]}"
             )
             key = base64.b64encode(credentials.encode("utf-8")).decode("utf-8")
-            if self.headers.getheader("Authorization") == "Basic " + key:
+            if self.headers.get("Authorization") == "Basic " + key:
                 return True
 
             # Let the client know that authentication is required
