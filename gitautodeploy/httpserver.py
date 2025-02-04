@@ -6,6 +6,8 @@ import logging
 import json
 import threading
 import base64
+import time
+import os
 
 from http.server import SimpleHTTPRequestHandler
 from urllib.parse import parse_qs
@@ -251,16 +253,13 @@ def webhook_request_handler_factory(config, event_store, server_status, is_https
         def log_message(self, log_format, *args):
             """Overloads the default message logging method to allow messages to
             go through our custom logger instead."""
-            import logging
 
             logger = logging.getLogger()
-            logger.info(f"{self.client_address[0]} - {log_format % args}")
+            formatted = log_format % args
+            logger.info("%s - %s", self.client_address[0], formatted)
 
         def save_test_case(self, test_case):
             """Log request information in a way it can be used as a test case."""
-            import time
-            import json
-            import os
 
             # Mask some header values
             masked_headers = ["x-github-delivery", "x-hub-signature"]

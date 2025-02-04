@@ -305,7 +305,9 @@ class GitAutoDeploy:
         self.create_pid_file()
 
         # Generate auth key to protect the web socket server
-        self._server_status["auth-key"] = base64.b64encode(os.urandom(32))
+        self._server_status["auth-key"] = base64.b64encode(os.urandom(32)).decode(
+            "utf-8"
+        )
 
         # Clear any existing lock files, with no regard to possible ongoing processes
         for repo_config in self._config["repositories"]:
