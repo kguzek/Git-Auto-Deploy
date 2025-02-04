@@ -113,7 +113,7 @@ def webhook_request_handler_factory(config, event_store, server_status, is_https
             # Payloads from GitHub can be delivered as form data.
             # Test the request for this pattern and extract json payload
             if request_headers["content-type"] == "application/x-www-form-urlencoded":
-                res = parse_qs(request_body.decode("utf-8"))
+                res = parse_qs(request_body)
                 if "payload" in res and len(res["payload"]) == 1:
                     request_body = res["payload"][0]
 
