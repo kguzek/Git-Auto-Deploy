@@ -44,16 +44,23 @@ class GitHubRequestParser(WebhookRequestParserBase):
 
             if "secret-token" not in repo_config:
                 continue
-            if "x-hub-signature" not in request_headers:
-                action.log_info(
-                    f"Request signature is missing for repository {repo_config["url"]}."
+            signature_header_256 = request_headers.get("x-hub-signature-256")
+            if signature_header_256 is None:
+                signature_header_sha1 = request_headers.get("x-hub-signature")
+                if signature_header_sha1 is None:
+                    action.log_info(
+                        f"Request signature is missing for repository {repo_config["url"]}."
+                    )
+                    return False
+                signature_valid = self.verify_signature_sha1(
+                    repo_config["secret-token"],
+                    request_body,
+                    signature_header_sha1,
                 )
-                return False
-            signature_valid = self.verify_signature(
-                repo_config["secret-token"],
-                request_body,
-                request_headers["x-hub-signature"],
-            )
+            else:
+                signature_valid = self.verify_signature_256(
+                    repo_config["secret-token"], request_body, signature_header_256
+                )
             action.log_info(f"Signature is {"valid" if signature_valid else "invalid"}")
             if not signature_valid:
                 action.log_info(
@@ -64,7 +71,23 @@ class GitHubRequestParser(WebhookRequestParserBase):
 
         return True
 
-    def verify_signature(self, token, body, signature):
+    def verify_signature_256(
+        self, secret_token: str, payload_body: str, signature_header
+    ):
+        """Verify that the payload was sent from GitHub by validating SHA256.
+
+        Args:
+            secret_token: GitHub app webhook token (WEBHOOK_SECRET)
+            payload_body: original request body to verify (request.body())
+            signature_header: header received from GitHub (x-hub-signature-256)
+        """
+        hash_object = hmac.new(
+            secret_token.encode("utf-8"), msg=payload_body, digestmod=hashlib.sha256
+        )
+        expected_signature = "sha256=" + hash_object.hexdigest()
+        return hmac.compare_digest(expected_signature, signature_header)
+
+    def verify_signature_sha1(self, token, body, signature):
         """Verify the signature of the incoming request"""
         if isinstance(body, str):
             body = body.encode("utf-8")
