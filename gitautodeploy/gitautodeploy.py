@@ -468,12 +468,6 @@ class GitAutoDeploy:
         if not self._config["wss-enabled"]:
             return
 
-        if not os.path.isfile(self._config["ssl-cert"]):
-            self._startup_event.log_critical(
-                f"Unable to activate SSL: File does not exist: {self._config["ssl-cert"]}"
-            )
-            return
-
         try:
             from autobahn.websocket import (
                 WebSocketServerFactory,
@@ -494,6 +488,12 @@ class GitAutoDeploy:
             public_port = self._config["ws-public-port"] or self._config["wss-port"]
             use_ssl = self._config["ws-always-ssl"]
             if use_ssl:
+                if not os.path.isfile(self._config["ssl-cert"]):
+                    self._startup_event.log_critical(
+                        f"Unable to activate SSL: File does not exist: {self._config["ssl-cert"]}"
+                    )
+                    return
+
                 # note to self: if using putChild, the child must be bytes...
                 if self._config["ssl-key"] and self._config["ssl-cert"]:
                     context_factory = twisted_ssl.DefaultOpenSSLContextFactory(
