@@ -103,6 +103,7 @@ class GitAutoDeploy:
         # from the startup process
         self._startup_event = StartupEvent()
         self._event_store.register_action(self._startup_event)
+        self._ws_server_port = None
 
     def clone_all_repos(self):
         """Iterates over all configured repositories and clones them to their
@@ -189,7 +190,7 @@ class GitAutoDeploy:
             # Spawn first child. Returns 0 in the child and pid in the parent.
             pid = os.fork()
         except OSError as e:
-            raise Exception("%s [%d]" % (e.strerror, e.errno)) from e
+            raise Exception(f"{e.strerror} [{e.errno}]") from e
 
         # First child
         if pid == 0:
@@ -249,7 +250,7 @@ class GitAutoDeploy:
 
         # Set up logging
         logger = logging.getLogger()
-        logFormatter = self.get_log_formatter()
+        log_formatter = self.get_log_formatter()
 
         # Enable console output?
         if ("quiet" in self._config and self._config["quiet"]) or (
@@ -271,14 +272,17 @@ class GitAutoDeploy:
 
         if "log-file" in self._config and self._config["log-file"]:
             # Translate any ~ in the path into /home/<user>
-            fileHandler = logging.FileHandler(self._config["log-file"])
-            fileHandler.setFormatter(logFormatter)
-            logger.addHandler(fileHandler)
+            file_handler = logging.FileHandler(self._config["log-file"])
+            file_handler.setFormatter(log_formatter)
+            logger.addHandler(file_handler)
 
         # Display a warning when trying to run as root
         if not self._config["allow-root-user"] and getpass.getuser() == "root":
             logger.critical(
-                'Refusing to start as root. This application shouldn\'t run as a privileged user. Please run it as a different user. To disregard this warning and start anyway, set the config option "allow-root-user" to true, or use the command line argument --allow-root-user'
+                "Refusing to start as root. This application shouldn't run as a privileged user. "
+                "Please run it as a different user. To disregard this warning and start anyway, "
+                "set the config option 'allow-root-user' to true, or use the command line argument "
+                "--allow-root-user"
             )
             sys.exit()
 
@@ -455,7 +459,8 @@ class GitAutoDeploy:
         event.log_info("HTTPS server did quit")
 
     def serve_wss(self):
-        """Start a web socket server over SSL, used by the web UI to get notifications about updates."""
+        """Start a web socket server over SSL.
+        Used by the web UI to get notifications about updates."""
         # Start a web socket server if the web UI is enabled
         if not self._config["web-ui-enabled"]:
             return
@@ -470,7 +475,6 @@ class GitAutoDeploy:
             return
 
         try:
-            import os
             from autobahn.websocket import (
                 WebSocketServerFactory,
             )
@@ -486,31 +490,35 @@ class GitAutoDeploy:
             factory = WebSocketServerFactory(uri)
             factory.protocol = WebSocketClientHandler
             # factory.setProtocolOptions(maxConnections=2)
+            public_host = self._config["ws-public-host"] or self._config["wss-host"]
+            public_port = self._config["ws-public-port"] or self._config["wss-port"]
+            use_ssl = self._config["ws-always-ssl"]
+            if use_ssl:
+                # note to self: if using putChild, the child must be bytes...
+                if self._config["ssl-key"] and self._config["ssl-cert"]:
+                    context_factory = twisted_ssl.DefaultOpenSSLContextFactory(
+                        privateKeyFileName=self._config["ssl-key"],
+                        certificateFileName=self._config["ssl-cert"],
+                    )
+                else:
+                    context_factory = twisted_ssl.DefaultOpenSSLContextFactory(
+                        privateKeyFileName=self._config["ssl-cert"],
+                        certificateFileName=self._config["ssl-cert"],
+                    )
 
-            # note to self: if using putChild, the child must be bytes...
-            if self._config["ssl-key"] and self._config["ssl-cert"]:
-                contextFactory = twisted_ssl.DefaultOpenSSLContextFactory(
-                    privateKeyFileName=self._config["ssl-key"],
-                    certificateFileName=self._config["ssl-cert"],
+                self._ws_server_port = reactor.listenSSL(
+                    self._config["wss-port"], factory, context_factory
                 )
+
+                self._server_status["wss-uri"] = f"wss://{public_host}:{public_port}"
             else:
-                contextFactory = twisted_ssl.DefaultOpenSSLContextFactory(
-                    privateKeyFileName=self._config["ssl-cert"],
-                    certificateFileName=self._config["ssl-cert"],
+                self._ws_server_port = reactor.listenTCP(
+                    self._config["wss-port"], factory
                 )
-
-            self._ws_server_port = reactor.listenSSL(
-                self._config["wss-port"], factory, contextFactory
-            )
-            # self._ws_server_port = reactor.listenTCP(self._config['wss-port'], factory)
-
-            self._server_status["wss-uri"] = "wss://%s:%s" % (
-                self._config["wss-host"],
-                self._config["wss-port"],
-            )
+                self._server_status["wss-uri"] = f"ws://{public_host}:{public_port}"
 
             self._startup_event.log_info(
-                "Listening for connections on %s" % self._server_status["wss-uri"]
+                f"Listening for connections on {self._server_status["wss-uri"]}"
             )
             self._startup_event.ws_address = self._config["wss-host"]
             self._startup_event.ws_port = self._config["wss-port"]
@@ -520,9 +528,7 @@ class GitAutoDeploy:
             reactor.run(installSignalHandlers=False)
 
         except BindError as e:
-            self._startup_event.log_critical(
-                "Unable to start web socket server: %s" % e
-            )
+            self._startup_event.log_critical(f"Unable to start web socket server: {e}")
 
         except ImportError:
             self._startup_event.log_error(
@@ -542,7 +548,8 @@ class GitAutoDeploy:
         # Add script dir to sys path, allowing us to import sub modules even after changing cwd
         sys.path.insert(1, os.path.dirname(os.path.realpath(__file__)))
 
-        # Set CWD to public www folder. This makes the http server serve files from the wwwroot directory.
+        # Set CWD to public www folder.
+        # This makes the http server serve files from the wwwroot directory.
         wwwroot = os.path.join(os.path.dirname(os.path.realpath(__file__)), "wwwroot")
         os.chdir(wwwroot)
 
@@ -567,6 +574,7 @@ class GitAutoDeploy:
                 thread.join(5)
 
     def signal_handler(self, signum, _frame):
+        """Signal handler for SIGHUP and SIGINT signals"""
 
         self.stop()
 
@@ -580,7 +588,7 @@ class GitAutoDeploy:
             return
 
         # Keyboard interrupt signal
-        elif signum == 2:
+        if signum == 2:
             event.log_info(
                 f"Recieved keyboard interrupt signal ({signum}) from the OS, shutting down."
             )
@@ -624,7 +632,7 @@ class GitAutoDeploy:
             pass
 
     def exit(self):
-
+        """Exit the application"""
         logger = logging.getLogger()
         logger.info("Goodbye")
 
