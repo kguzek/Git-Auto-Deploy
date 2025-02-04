@@ -1,31 +1,78 @@
-if __name__ == '__main__':
-    import sys
-    print("Critical - GAD must be started as a python module, for example using python -m gitautodeploy")
+"""Application entry point for Git Auto Deploy."""
+
+import os
+import logging
+import sys
+import socket
+import ssl
+import re
+import errno
+import json
+import base64
+import getpass
+from http.server import HTTPServer
+import threading
+import signal
+
+from .events import SystemEvent, EventStore, StartupEvent
+from .lock import Lock
+from .wrappers import GitWrapper, ProcessWrapper
+
+from .wsserver import WebSocketClientHandlerFactory
+from .httpserver import webhook_request_handler_factory
+
+from .cli.config import get_config_defaults, get_config_from_environment
+from .cli.config import get_config_from_argv
+from .cli.config import get_config_from_file, get_repo_config_from_environment
+from .cli.config import (
+    init_config,
+    get_config_file_path,
+    rename_legacy_attribute_names,
+)
+from .cli.config import ConfigFileNotFoundException, ConfigFileInvalidException
+
+
+# This solves https://github.com/olipo186/Git-Auto-Deploy/issues/118
+try:
+    from logging import NullHandler
+except ImportError:
+    from logging import Handler
+
+    class NullHandler(Handler):
+        """No-op"""
+
+        def emit(self, record):
+            pass
+
+
+if __name__ == "__main__":
+    print(
+        "Critical - GAD must be started as a python module, "
+        "for example using python -m gitautodeploy"
+    )
     sys.exit()
 
 
-class LogInterface(object):
+class LogInterface:
     """Interface that functions as a stdout and stderr handler and directs the
     output to the logging module, which in turn will output to either console,
     file or both."""
 
     def __init__(self, level=None):
-        import logging
-        self.level = (level if level else logging.getLogger().info)
+        self.level = level if level else logging.getLogger().info
 
     def write(self, msg):
+        """Write a message to the log"""
         for line in msg.strip().split("\n"):
             self.level(line)
 
     def flush(self):
-        pass
+        """Flush the output buffer (no-op)"""
 
 
-from .wsserver import WebSocketClientHandlerFactory
-from .httpserver import WebhookRequestHandlerFactory
+class GitAutoDeploy:
+    """Main app instance"""
 
-
-class GitAutoDeploy(object):
     _instance = None
     _http_server = None
     _https_server = None
@@ -43,12 +90,10 @@ class GitAutoDeploy(object):
     def __new__(cls, *args, **kwargs):
         """Overload constructor to enable singleton access"""
         if not cls._instance:
-            cls._instance = super(GitAutoDeploy, cls).__new__(
-                cls, *args, **kwargs)
+            cls._instance = super(GitAutoDeploy, cls).__new__(cls, *args, **kwargs)
         return cls._instance
 
     def __init__(self):
-        from .events import EventStore, StartupEvent
 
         # Setup an event store instance that can keep a global record of events
         self._event_store = EventStore()
@@ -62,74 +107,76 @@ class GitAutoDeploy(object):
     def clone_all_repos(self):
         """Iterates over all configured repositories and clones them to their
         configured paths."""
-        import os
-        import re
-        import logging
-        from .wrappers import GitWrapper
+
         logger = logging.getLogger()
 
-        if 'repositories' not in self._config:
+        if "repositories" not in self._config:
             return
 
         # Iterate over all configured repositories
-        for repo_config in self._config['repositories']:
+        for repo_config in self._config["repositories"]:
 
             # Only clone repositories with a configured path
-            if 'url' not in repo_config:
+            if "url" not in repo_config:
                 logger.critical("Repository has no configured URL")
                 self.exit()
                 return
 
             # Only clone repositories with a configured path
-            if 'path' not in repo_config:
-                logger.debug("Repository %s will not be cloned (no path configured)" % repo_config['url'])
+            if "path" not in repo_config:
+                logger.debug(
+                    "Repository %s will not be cloned (no path configured)",
+                    repo_config["url"],
+                )
                 continue
 
-            if os.path.isdir(repo_config['path']) and os.path.isdir(repo_config['path']+'/.git'):
+            if os.path.isdir(repo_config["path"]) and os.path.isdir(
+                repo_config["path"] + "/.git"
+            ):
                 GitWrapper.init(repo_config)
             else:
                 GitWrapper.clone(repo_config)
 
     def ssh_key_scan(self):
-        import re
-        import logging
-        from .wrappers import ProcessWrapper
+        """Scans for ssh keys in the repositories and adds them to the known_hosts file"""
         logger = logging.getLogger()
 
-        for repository in self._config['repositories']:
+        for repository in self._config["repositories"]:
 
-            if 'url' not in repository:
+            if "url" not in repository:
                 continue
 
-            logger.info("Scanning repository: %s" % repository['url'])
-            m = re.match('[^\@]+\@([^\:\/]+)(:(\d+))?', repository['url'])
+            logger.info("Scanning repository: %s", repository["url"])
+            m = re.match(r"[^\@]+\@([^\:\/]+)(:(\d+))?", repository["url"])
 
             if m is not None:
                 host = m.group(1)
                 port = m.group(3)
-                port_arg = '' if port is None else ('-p %s ' % port)
-                cmd = 'ssh-keyscan %s%s >> $HOME/.ssh/known_hosts' % (port_arg, host)
+                port_arg = "" if port is None else f"-p {port} "
+                cmd = f"ssh-keyscan {port_arg}{host} >> $HOME/.ssh/known_hosts"
                 ProcessWrapper().call([cmd], shell=True)
 
             else:
-                logger.error('Could not find regexp match in path: %s' % repository['url'])
+                logger.error(
+                    "Could not find regexp match in path: %s", repository["url"]
+                )
 
     def create_pid_file(self):
-        import os
-
-        with open(self._config['pid-file'], 'w') as f:
+        """Creates the lockfile"""
+        with open(self._config["pid-file"], "w", encoding="utf8") as f:
             f.write(str(os.getpid()))
 
     def read_pid_file(self):
-        with open(self._config['pid-file'], 'r') as f:
+        """Returns the previously written pid"""
+        with open(self._config["pid-file"], "r", encoding="utf8") as f:
             return f.readlines()
 
     def remove_pid_file(self):
-        import os
-        import errno
-        if 'pid-file' in self._config and self._config['pid-file']:
+        """Removes the pid file"""
+
+        if "pid-file" in self._config and self._config["pid-file"]:
             try:
-                os.remove(self._config['pid-file'])
+                os.remove(self._config["pid-file"])
             except OSError as e:
                 # errno.ENOENT = no such file or directory
                 if e.errno != errno.ENOENT:
@@ -137,13 +184,12 @@ class GitAutoDeploy(object):
 
     @staticmethod
     def create_daemon():
-        import os
-
+        """Daemonize the process"""
         try:
             # Spawn first child. Returns 0 in the child and pid in the parent.
             pid = os.fork()
         except OSError as e:
-            raise Exception("%s [%d]" % (e.strerror, e.errno))
+            raise Exception("%s [%d]" % (e.strerror, e.errno)) from e
 
         # First child
         if pid == 0:
@@ -154,7 +200,7 @@ class GitAutoDeploy(object):
                 pid = os.fork()
 
             except OSError as e:
-                raise Exception("%s [%d]" % (e.strerror, e.errno))
+                raise Exception(f"{e.strerror} [{e.errno}]") from e
 
             if pid == 0:
                 os.umask(0)
@@ -168,53 +214,35 @@ class GitAutoDeploy(object):
         return 0
 
     def update(self, *args, **kwargs):
-        import json
-        data = json.dumps(kwargs).encode('utf-8')
+        """Update all connected web socket clients with the provided data."""
+        data = json.dumps(kwargs).encode("utf-8")
         for client in self._ws_clients:
             client.sendMessage(data)
 
     def get_log_formatter(self):
-        import logging
+        """Returns a log formatter that includes the timestamp and log level."""
+
         return logging.Formatter("%(asctime)s [%(levelname)-5.5s]  %(message)s")
 
     def setup_console_logger(self):
-        import logging
-
-        # Set up logging
+        """Set up a console logger that outputs to stdout."""
         logger = logging.getLogger()
 
-        consoleHandler = logging.StreamHandler()
-        consoleHandler.setFormatter(self.get_log_formatter())
+        console_handler = logging.StreamHandler()
+        console_handler.setFormatter(self.get_log_formatter())
 
         # Check if a stream handler is already present (will be if GAD is started by test script)
         handler_present = False
         for handler in logger.handlers:
-            if isinstance(handler, type(consoleHandler)):
+            if isinstance(handler, type(console_handler)):
                 handler_present = True
                 break
 
         if not handler_present:
-            logger.addHandler(consoleHandler)
+            logger.addHandler(console_handler)
 
     def setup(self, config):
         """Setup an instance of GAD based on the provided config object."""
-        import sys
-        import socket
-        import os
-        import logging
-        import base64
-        from .lock import Lock
-        import getpass
-
-        # This solves https://github.com/olipo186/Git-Auto-Deploy/issues/118
-        try:
-            from logging import NullHandler
-        except ImportError:
-            from logging import Handler
-
-            class NullHandler(Handler):
-                def emit(self, record):
-                    pass
 
         # Attatch config values to this instance
         self._config = config
@@ -224,7 +252,9 @@ class GitAutoDeploy(object):
         logFormatter = self.get_log_formatter()
 
         # Enable console output?
-        if ('quiet' in self._config and self._config['quiet']) or ('daemon-mode' in self._config and self._config['daemon-mode']):
+        if ("quiet" in self._config and self._config["quiet"]) or (
+            "daemon-mode" in self._config and self._config["daemon-mode"]
+        ):
 
             # Add a default null handler that suppresses any console output
             logger.addHandler(NullHandler())
@@ -235,23 +265,25 @@ class GitAutoDeploy(object):
             self.setup_console_logger()
 
         # Set logging level
-        if 'log-level' in self._config:
-            level = logging.getLevelName(self._config['log-level'])
+        if "log-level" in self._config:
+            level = logging.getLevelName(self._config["log-level"])
             logger.setLevel(level)
 
-        if 'log-file' in self._config and self._config['log-file']:
+        if "log-file" in self._config and self._config["log-file"]:
             # Translate any ~ in the path into /home/<user>
-            fileHandler = logging.FileHandler(self._config['log-file'])
+            fileHandler = logging.FileHandler(self._config["log-file"])
             fileHandler.setFormatter(logFormatter)
             logger.addHandler(fileHandler)
 
         # Display a warning when trying to run as root
-        if not self._config['allow-root-user'] and getpass.getuser() == 'root':
-            logger.critical("Refusing to start as root. This application shouldn't run as a privileged used. Please run it as a different user. To disregard this warning and start anyway, set the config option \"allow-root-user\" to true, or use the command line argument --allow-root-user")
+        if not self._config["allow-root-user"] and getpass.getuser() == "root":
+            logger.critical(
+                'Refusing to start as root. This application shouldn\'t run as a privileged user. Please run it as a different user. To disregard this warning and start anyway, set the config option "allow-root-user" to true, or use the command line argument --allow-root-user'
+            )
             sys.exit()
 
-        if 'ssh-keyscan' in self._config and self._config['ssh-keyscan']:
-            self._startup_event.log_info('Scanning repository hosts for ssh keys...')
+        if "ssh-keyscan" in self._config and self._config["ssh-keyscan"]:
+            self._startup_event.log_info("Scanning repository hosts for ssh keys...")
             self.ssh_key_scan()
 
         # Clone all repos once initially
@@ -259,70 +291,68 @@ class GitAutoDeploy(object):
 
         # Set default stdout and stderr to our logging interface (that writes
         # to file and console depending on user preference)
-        if 'intercept-stdout' in self._config and self._config['intercept-stdout']:
+        if "intercept-stdout" in self._config and self._config["intercept-stdout"]:
             self._default_stdout = sys.stdout
             self._default_stderr = sys.stderr
             sys.stdout = LogInterface(logger.info)
             sys.stderr = LogInterface(logger.error)
 
-        if 'daemon-mode' in self._config and self._config['daemon-mode']:
-            self._startup_event.log_info('Starting Git Auto Deploy in daemon mode')
+        if "daemon-mode" in self._config and self._config["daemon-mode"]:
+            self._startup_event.log_info("Starting Git Auto Deploy in daemon mode")
             GitAutoDeploy.create_daemon()
 
         self._pid = os.getpid()
         self.create_pid_file()
 
         # Generate auth key to protect the web socket server
-        self._server_status['auth-key'] = base64.b64encode(os.urandom(32))
+        self._server_status["auth-key"] = base64.b64encode(os.urandom(32))
 
         # Clear any existing lock files, with no regard to possible ongoing processes
-        for repo_config in self._config['repositories']:
+        for repo_config in self._config["repositories"]:
 
             # Do we have a physical repository?
-            if 'path' in repo_config:
-                Lock(os.path.join(repo_config['path'], 'status_running')).clear()
-                Lock(os.path.join(repo_config['path'], 'status_waiting')).clear()
+            if "path" in repo_config:
+                Lock(os.path.join(repo_config["path"], "status_running")).clear()
+                Lock(os.path.join(repo_config["path"], "status_waiting")).clear()
 
-        #if 'daemon-mode' not in self._config or not self._config['daemon-mode']:
+        # if 'daemon-mode' not in self._config or not self._config['daemon-mode']:
         #    self._startup_event.log_info('Git Auto Deploy started')
 
     def serve_http(self, serve_forever=True):
         """Starts a HTTP server that listens for webhook requests and serves the web ui."""
-        import sys
-        import socket
-        import os
-        from .events import SystemEvent
 
-        try:
-            from BaseHTTPServer import HTTPServer
-        except ImportError as e:
-            from http.server import HTTPServer
-
-        if not self._config['http-enabled']:
+        if not self._config["http-enabled"]:
             return
 
         # Setup
         try:
 
             # Create web hook request handler class
-            WebhookRequestHandler = WebhookRequestHandlerFactory(self._config, self._event_store, self._server_status, is_https=False)
+            WebhookRequestHandler = webhook_request_handler_factory(
+                self._config, self._event_store, self._server_status, is_https=False
+            )
 
             # Create HTTP server
-            self._http_server = HTTPServer((self._config['http-host'],
-                                       self._config['http-port']),
-                                      WebhookRequestHandler)
+            self._http_server = HTTPServer(
+                (self._config["http-host"], self._config["http-port"]),
+                WebhookRequestHandler,
+            )
 
             # Setup SSL for HTTP server
             sa = self._http_server.socket.getsockname()
             self._http_port = sa[1]
-            self._server_status['http-uri'] = "http://%s:%s" % (self._config['http-host'], sa[1])
-            self._startup_event.log_info("Listening for connections on %s" % self._server_status['http-uri'])
+            self._server_status["http-uri"] = (
+                f"http://{self._config["http-host"]}:{sa[1]}"
+            )
+            self._startup_event.log_info(
+                f"Listening for connections on {self._server_status["http-uri"]}"
+            )
             self._startup_event.http_address = sa[0]
             self._startup_event.http_port = sa[1]
             self._startup_event.set_http_started(True)
 
         except socket.error as e:
-            self._startup_event.log_critical("Unable to start HTTP server: %s" % e)
+            self._startup_event.log_critical(f"Unable to start HTTP server: {e}")
             return
 
         if not serve_forever:
@@ -335,69 +365,70 @@ class GitAutoDeploy(object):
         except socket.error as e:
             event = SystemEvent()
             self._event_store.register_action(event)
-            event.log_critical("Error on socket: %s" % e)
+            event.log_critical(f"Error on socket: {e}")
             sys.exit(1)
 
         except KeyboardInterrupt as e:
             event = SystemEvent()
             self._event_store.register_action(event)
-            event.log_info('Requested close by keyboard interrupt signal')
+            event.log_info("Requested close by keyboard interrupt signal")
             self.stop()
             self.exit()
 
         event = SystemEvent()
         self._event_store.register_action(event)
-        event.log_info('HTTP server did quit')
+        event.log_info("HTTP server did quit")
 
     def serve_https(self):
         """Starts a HTTPS server that listens for webhook requests and serves the web ui."""
-        import sys
-        import socket
-        import os
-        import ssl
-        from .events import SystemEvent
 
-        try:
-            from BaseHTTPServer import HTTPServer
-        except ImportError as e:
-            from http.server import HTTPServer
-
-        if not self._config['https-enabled']:
+        if not self._config["https-enabled"]:
             return
 
-        if not os.path.isfile(self._config['ssl-cert']):
-            self._startup_event.log_critical("Unable to activate SSL: File does not exist: %s" % self._config['ssl-cert'])
+        if not os.path.isfile(self._config["ssl-cert"]):
+            self._startup_event.log_critical(
+                f"Unable to activate SSL: File does not exist: {self._config["ssl-cert"]}"
+            )
             return
 
         # Setup
         try:
 
             # Create web hook request handler class
-            WebhookRequestHandler = WebhookRequestHandlerFactory(self._config, self._event_store, self._server_status, is_https=True)
+            WebhookRequestHandler = webhook_request_handler_factory(
+                self._config, self._event_store, self._server_status, is_https=True
+            )
 
             # Create HTTP server
-            self._https_server = HTTPServer((self._config['https-host'],
-                                       self._config['https-port']),
-                                      WebhookRequestHandler)
+            self._https_server = HTTPServer(
+                (self._config["https-host"], self._config["https-port"]),
+                WebhookRequestHandler,
+            )
 
             # Setup SSL for HTTP server
             self._https_server_unwrapped_socket = self._https_server.socket
-            self._https_server.socket = ssl.wrap_socket(self._https_server.socket,
-                                                keyfile=self._config['ssl-key'],
-                                                certfile=self._config['ssl-cert'],
-                                                server_side=True)
+            self._https_server.socket = ssl.wrap_socket(
+                self._https_server.socket,
+                keyfile=self._config["ssl-key"],
+                certfile=self._config["ssl-cert"],
+                server_side=True,
+            )
 
             sa = self._https_server.socket.getsockname()
             self._http_port = sa[1]
-            self._server_status['https-uri'] = "https://%s:%s" % (self._config['https-host'], sa[1])
+            self._server_status["https-uri"] = (
+                f"https://{self._config["https-host"]}:{sa[1]}"
+            )
 
-            self._startup_event.log_info("Listening for connections on %s" % self._server_status['https-uri'])
+            self._startup_event.log_info(
+                f"Listening for connections on {self._server_status["https-uri"]}"
+            )
             self._startup_event.http_address = sa[0]
             self._startup_event.http_port = sa[1]
             self._startup_event.set_http_started(True)
 
         except socket.error as e:
-            self._startup_event.log_critical("Unable to start HTTPS server: %s" % e)
+            self._startup_event.log_critical(f"Unable to start HTTPS server: {e}")
             return
 
         # Run forever
@@ -407,98 +438,101 @@ class GitAutoDeploy(object):
         except socket.error as e:
             event = SystemEvent()
             self._event_store.register_action(event)
-            event.log_critical("Error on socket: %s" % e)
+            event.log_critical(f"Error on socket: {e}")
             sys.exit(1)
 
         except KeyboardInterrupt as e:
             event = SystemEvent()
             self._event_store.register_action(event)
-            event.log_info('Requested close by keyboard interrupt signal')
+            event.log_info("Requested close by keyboard interrupt signal")
             self.stop()
             self.exit()
 
         event = SystemEvent()
         self._event_store.register_action(event)
-        event.log_info('HTTPS server did quit')
+        event.log_info("HTTPS server did quit")
 
     def serve_wss(self):
         """Start a web socket server over SSL, used by the web UI to get notifications about updates."""
-        import os
-        from .events import SystemEvent
-
         # Start a web socket server if the web UI is enabled
-        if not self._config['web-ui-enabled']:
+        if not self._config["web-ui-enabled"]:
             return
 
-        if not self._config['wss-enabled']:
+        if not self._config["wss-enabled"]:
             return
 
-        if not os.path.isfile(self._config['ssl-cert']):
-            self._startup_event.log_critical("Unable to activate SSL: File does not exist: %s" % self._config['ssl-cert'])
+        if not os.path.isfile(self._config["ssl-cert"]):
+            self._startup_event.log_critical(
+                f"Unable to activate SSL: File does not exist: {self._config["ssl-cert"]}"
+            )
             return
 
         try:
             import os
-            from autobahn.websocket import WebSocketServerProtocol, WebSocketServerFactory
-            from twisted.internet import reactor, ssl
+            from autobahn.websocket import (
+                WebSocketServerFactory,
+            )
+            from twisted.internet import reactor, ssl as twisted_ssl
             from twisted.internet.error import BindError
 
             # Create a WebSocketClientHandler instance
-            WebSocketClientHandler = WebSocketClientHandlerFactory(self._config, self._ws_clients, self._event_store, self._server_status)
+            WebSocketClientHandler = WebSocketClientHandlerFactory(
+                self._config, self._ws_clients, self._event_store, self._server_status
+            )
 
-            uri = u"ws://%s:%s" % (self._config['wss-host'], self._config['wss-port'])
+            uri = f"ws://{self._config["wss-host"]}:{self._config["wss-port"]}"
             factory = WebSocketServerFactory(uri)
             factory.protocol = WebSocketClientHandler
             # factory.setProtocolOptions(maxConnections=2)
 
             # note to self: if using putChild, the child must be bytes...
-            if self._config['ssl-key'] and self._config['ssl-cert']:
-                contextFactory = ssl.DefaultOpenSSLContextFactory(privateKeyFileName=self._config['ssl-key'], certificateFileName=self._config['ssl-cert'])
+            if self._config["ssl-key"] and self._config["ssl-cert"]:
+                contextFactory = twisted_ssl.DefaultOpenSSLContextFactory(
+                    privateKeyFileName=self._config["ssl-key"],
+                    certificateFileName=self._config["ssl-cert"],
+                )
             else:
-                contextFactory = ssl.DefaultOpenSSLContextFactory(privateKeyFileName=self._config['ssl-cert'], certificateFileName=self._config['ssl-cert'])
+                contextFactory = twisted_ssl.DefaultOpenSSLContextFactory(
+                    privateKeyFileName=self._config["ssl-cert"],
+                    certificateFileName=self._config["ssl-cert"],
+                )
 
-
-            self._ws_server_port = reactor.listenSSL(self._config['wss-port'], factory, contextFactory)
+            self._ws_server_port = reactor.listenSSL(
+                self._config["wss-port"], factory, contextFactory
+            )
             # self._ws_server_port = reactor.listenTCP(self._config['wss-port'], factory)
 
-            self._server_status['wss-uri'] = "wss://%s:%s" % (self._config['wss-host'], self._config['wss-port'])
+            self._server_status["wss-uri"] = "wss://%s:%s" % (
+                self._config["wss-host"],
+                self._config["wss-port"],
+            )
 
-            self._startup_event.log_info("Listening for connections on %s" % self._server_status['wss-uri'])
-            self._startup_event.ws_address = self._config['wss-host']
-            self._startup_event.ws_port = self._config['wss-port']
+            self._startup_event.log_info(
+                "Listening for connections on %s" % self._server_status["wss-uri"]
+            )
+            self._startup_event.ws_address = self._config["wss-host"]
+            self._startup_event.ws_port = self._config["wss-port"]
             self._startup_event.set_ws_started(True)
 
             # Serve forever (until reactor.stop())
             reactor.run(installSignalHandlers=False)
 
         except BindError as e:
-            self._startup_event.log_critical("Unable to start web socket server: %s" % e)
+            self._startup_event.log_critical(
+                "Unable to start web socket server: %s" % e
+            )
 
         except ImportError:
-            self._startup_event.log_error("Unable to start web socket server due to missing dependency.")
+            self._startup_event.log_error(
+                "Unable to start web socket server due to missing dependency."
+            )
 
         event = SystemEvent()
         self._event_store.register_action(event)
-        event.log_info('WSS server did quit')
+        event.log_info("WSS server did quit")
 
     def serve_forever(self):
         """Start HTTP and web socket servers."""
-        import sys
-        import socket
-        import logging
-        import os
-        from .events import SystemEvent
-        import threading
-
-        try:
-            from autobahn.websocket import WebSocketServerProtocol, WebSocketServerFactory
-            from twisted.internet import reactor
-
-            # Given that the necessary dependencies are present, notify the
-            # event that we expect the web socket server to be started
-            self._startup_event.ws_started = False
-        except ImportError:
-            pass
 
         # Notify the event that we expect the http server to be started
         self._startup_event.http_started = False
@@ -513,12 +547,10 @@ class GitAutoDeploy(object):
         threads = [
             # HTTP server
             threading.Thread(target=self.serve_http),
-
             # HTTPS server
             threading.Thread(target=self.serve_https),
-
             # Web socket SSL server
-            threading.Thread(target=self.serve_wss)
+            threading.Thread(target=self.serve_wss),
         ]
 
         # Start all threads
@@ -532,8 +564,8 @@ class GitAutoDeploy(object):
             while thread.is_alive():
                 thread.join(5)
 
-    def signal_handler(self, signum, frame):
-        from .events import SystemEvent
+    def signal_handler(self, signum, _frame):
+
         self.stop()
 
         event = SystemEvent()
@@ -547,10 +579,12 @@ class GitAutoDeploy(object):
 
         # Keyboard interrupt signal
         elif signum == 2:
-            event.log_info('Recieved keyboard interrupt signal (%s) from the OS, shutting down.' % signum)
+            event.log_info(
+                f"Recieved keyboard interrupt signal ({signum}) from the OS, shutting down."
+            )
 
         else:
-            event.log_info('Recieved signal (%s) from the OS, shutting down.' % signum)
+            event.log_info(f"Recieved signal ({signum}) from the OS, shutting down.")
 
         self.exit()
 
@@ -582,48 +616,38 @@ class GitAutoDeploy(object):
         # Stop web socket server if running
         try:
             from twisted.internet import reactor
+
             reactor.callFromThread(reactor.stop)
         except ImportError:
             pass
 
     def exit(self):
-        import sys
-        import logging
+
         logger = logging.getLogger()
-        logger.info('Goodbye')
+        logger.info("Goodbye")
 
         # Delete PID file
         self.remove_pid_file()
 
         # Restore stdin and stdout
-        if 'intercept-stdout' in self._config and self._config['intercept-stdout']:
+        if "intercept-stdout" in self._config and self._config["intercept-stdout"]:
             sys.stdout = self._default_stdout
             sys.stderr = self._default_stderr
 
 
 def main():
-    import signal
-    from gitautodeploy import GitAutoDeploy
-    from cli.config import get_config_defaults, get_config_from_environment
-    from cli.config import get_config_from_argv, find_config_file
-    from cli.config import get_config_from_file, get_repo_config_from_environment
-    from cli.config import init_config, get_config_file_path, rename_legacy_attribute_names
-    from cli.config import ConfigFileNotFoundException, ConfigFileInvalidException
-    import logging
-    import sys
-    import os
-
+    """Entry point"""
     logger = logging.getLogger()
 
     app = GitAutoDeploy()
 
-    if hasattr(signal, 'SIGHUP'):
+    if hasattr(signal, "SIGHUP"):
         signal.signal(signal.SIGHUP, app.signal_handler)
-    if hasattr(signal, 'SIGINT'):
+    if hasattr(signal, "SIGINT"):
         signal.signal(signal.SIGINT, app.signal_handler)
-    if hasattr(signal, 'SIGABRT'):
+    if hasattr(signal, "SIGABRT"):
         signal.signal(signal.SIGABRT, app.signal_handler)
-    if hasattr(signal, 'SIGPIPE') and hasattr(signal, 'SIG_IGN'):
+    if hasattr(signal, "SIGPIPE") and hasattr(signal, "SIG_IGN"):
         signal.signal(signal.SIGPIPE, signal.SIG_IGN)
 
     # Get default config values
@@ -637,7 +661,9 @@ def main():
     config.update(environment_config)
 
     search_target = os.path.dirname(os.path.realpath(__file__))
-    config_file_path = get_config_file_path(environment_config, argv_config, search_target)
+    config_file_path = get_config_file_path(
+        environment_config, argv_config, search_target
+    )
 
     # Config file path provided or found?
     if config_file_path:
@@ -646,11 +672,13 @@ def main():
             file_config = get_config_from_file(config_file_path)
         except ConfigFileNotFoundException as e:
             app.setup_console_logger()
-            logger.critical("No config file not found at '%s'" % e)
+            logger.critical("No config file not found at '%s'", e)
             return
         except ConfigFileInvalidException as e:
             app.setup_console_logger()
-            logger.critical("Unable to read config file due to invalid JSON format in '%s'" % e)
+            logger.critical(
+                "Unable to read config file due to invalid JSON format in '%s'", e
+            )
             return
 
         # Merge config values from config file (overrides environment variables)
@@ -667,10 +695,10 @@ def main():
 
     if repo_config:
 
-        if not 'repositories' in config:
-            config['repositories'] = []
+        if "repositories" not in config:
+            config["repositories"] = []
 
-        config['repositories'].append(repo_config)
+        config["repositories"].append(repo_config)
 
     # Initialize config by expanding with missing values
     init_config(config)
