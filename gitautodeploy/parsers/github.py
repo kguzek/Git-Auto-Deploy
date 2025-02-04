@@ -66,6 +66,8 @@ class GitHubRequestParser(WebhookRequestParserBase):
 
     def verify_signature(self, token, body, signature):
         """Verify the signature of the incoming request"""
+        if isinstance(body, str):
+            body = body.encode("utf-8")
         result = (
             "sha1=" + hmac.new(token.encode("utf-8"), body, hashlib.sha1).hexdigest()
         )
