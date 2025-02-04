@@ -38,18 +38,24 @@ class GitHubRequestParser(WebhookRequestParserBase):
         return repo_configs
 
     def validate_request(self, request_headers, request_body, repo_configs, action):
+        """Validates the incoming GitHub webhook request"""
 
         for repo_config in repo_configs:
 
-            # Validate secret token if present
-            if "secret-token" in repo_config and "x-hub-signature" in request_headers:
+            if "secret-token" in repo_config:
+                if "x-hub-signature" not in request_headers:
+                    action.log_info(
+                        f"Request signature is missing for repository {repo_config["url"]}."
+                    )
+                    return False
                 if not self.verify_signature(
                     repo_config["secret-token"],
                     request_body,
                     request_headers["x-hub-signature"],
                 ):
                     action.log_info(
-                        f"Request signature does not match the 'secret-token' configured for repository {repo_config["url"]}."
+                        f"Request signature does not match the 'secret-token' "
+                        f"configured for repository {repo_config["url"]}."
                     )
                     return False
 
