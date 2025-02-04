@@ -92,7 +92,7 @@ def webhook_request_handler_factory(config, event_store, server_status, is_https
             self.end_headers()
             self.wfile.write(json.dumps(data).encode("utf-8"))
 
-        def do_post(self):
+        def do_POST(self):
             """Invoked on incoming POST requests"""
 
             content_length = int(self.headers.get("content-length"))
