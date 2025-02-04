@@ -469,7 +469,7 @@ class GitAutoDeploy:
             return
 
         try:
-            from autobahn.websocket import (
+            from autobahn.twisted.websocket import (
                 WebSocketServerFactory,
             )
             from twisted.internet import reactor, ssl as twisted_ssl
