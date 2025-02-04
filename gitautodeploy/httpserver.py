@@ -96,7 +96,8 @@ def webhook_request_handler_factory(config, event_store, server_status, is_https
             """Invoked on incoming POST requests"""
 
             content_length = int(self.headers.get("content-length"))
-            request_body = self.rfile.read(content_length).decode("utf-8")
+            request_body_bytes = self.rfile.read(content_length)
+            request_body = request_body_bytes.decode("utf-8")
 
             # Extract request headers and make all keys to lowercase (makes them easier to compare)
             request_headers = dict(self.headers)
@@ -178,7 +179,7 @@ def webhook_request_handler_factory(config, event_store, server_status, is_https
                 )
 
                 if not service_handler.validate_request(
-                    request_headers, request_body, projects, action
+                    request_headers, request_body_bytes, projects, action
                 ):
                     self.send_error(400, "Bad request")
                     test_case["expected"]["status"] = 400

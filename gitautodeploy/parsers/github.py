@@ -40,9 +40,6 @@ class GitHubRequestParser(WebhookRequestParserBase):
     def validate_request(self, request_headers, request_body, repo_configs, action):
         """Validates the incoming GitHub webhook request"""
 
-        if isinstance(request_body, str):
-            request_body = request_body.encode("utf-8")
-
         for repo_config in repo_configs:
 
             if "secret-token" not in repo_config:
@@ -90,7 +87,7 @@ class GitHubRequestParser(WebhookRequestParserBase):
         expected_signature = "sha256=" + hash_object.hexdigest()
         return hmac.compare_digest(expected_signature, signature_header)
 
-    def verify_signature_sha1(self, token, body, signature):
+    def verify_signature_sha1(self, token: str, body: bytes, signature: str):
         """Verify the signature of the incoming request"""
         result = (
             "sha1=" + hmac.new(token.encode("utf-8"), body, hashlib.sha1).hexdigest()
