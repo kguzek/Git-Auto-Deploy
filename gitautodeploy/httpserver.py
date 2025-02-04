@@ -127,12 +127,12 @@ def webhook_request_handler_factory(config, event_store, server_status, is_https
 
             try:
                 # Will raise a ValueError exception if it fails
-                service_request_handler = get_service_handler(
-                    request_headers, request_body, action
+                service_handler = get_service_handler(
+                    request_headers, request_body, action, self._config
                 )
 
                 # Unable to identify the source of the request
-                if not service_request_handler:
+                if service_handler is None:
                     self.send_error(400, "Unrecognized service")
                     test_case["expected"]["status"] = 400
                     action.log_error(
@@ -143,10 +143,8 @@ def webhook_request_handler_factory(config, event_store, server_status, is_https
                     action.set_success(False)
                     return
 
-                service_handler = service_request_handler(self._config)
-
                 action.log_info(
-                    f"Handling the request with {service_request_handler.__name__}"
+                    f"Handling the request with {service_handler.__class__.__name__}"
                 )
 
                 # Could be GitHubParser, GitLabParser or other
