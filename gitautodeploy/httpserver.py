@@ -5,6 +5,7 @@ from __future__ import absolute_import
 import logging
 import json
 import threading
+import base64
 
 from http.server import SimpleHTTPRequestHandler
 from urllib.parse import parse_qs
@@ -348,7 +349,6 @@ def webhook_request_handler_factory(config, event_store, server_status, is_https
 
         def validate_web_ui_basic_auth(self):
             """Authenticate the user"""
-            import base64
 
             if not self._config["web-ui-auth-enabled"]:
                 return True
@@ -362,9 +362,10 @@ def webhook_request_handler_factory(config, event_store, server_status, is_https
                 return False
 
             # Verify that the provided username and password matches the ones in the config
-            key = base64.b64encode(
+            credentials = (
                 f"{self._config["web-ui-username"]}:{self._config["web-ui-password"]}"
             )
+            key = base64.b64encode(credentials.encode("utf-8")).decode("utf-8")
             if self.headers.getheader("Authorization") == "Basic " + key:
                 return True
 
