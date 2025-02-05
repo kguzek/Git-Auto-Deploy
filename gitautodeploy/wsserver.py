@@ -115,8 +115,10 @@ def websocket_client_handler_factory(config, clients, event_store, server_status
             if len(self._config["web-ui-whitelist"]) == 0:
                 return True
 
+            hosts = self.peer.split(":")
+
             # Verify that client IP is whitelisted
-            if self.peer.host in self._config["web-ui-whitelist"]:
+            if any(host in self._config["web-ui-whitelist"] for host in hosts):
                 return True
 
             self.sendClose()
