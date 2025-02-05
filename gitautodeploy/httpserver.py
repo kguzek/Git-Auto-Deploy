@@ -373,7 +373,7 @@ def webhook_request_handler_factory(config, event_store, server_status, is_https
             self.send_header("WWW-Authenticate", 'Basic realm="GAD"')
             self.send_header("Content-type", "text/html")
             self.end_headers()
-            self.wfile.write("Not authenticated")
+            self.wfile.write("Not authenticated".encode("utf-8"))
             return False
 
     return WebhookRequestHandler
