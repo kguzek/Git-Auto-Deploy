@@ -352,7 +352,7 @@ class GitAutoDeploy:
                 self._config["http-public-uri"] or http_local_uri
             )
             self._startup_event.log_info(
-                f"Listening for connections on {http_local_uri}"
+                f"Listening for connections on {self._server_status["http-uri"]}"
             )
             self._startup_event.http_address = sa[0]
             self._startup_event.http_port = sa[1]
@@ -516,7 +516,9 @@ class GitAutoDeploy:
                 local_uri = local_uri.replace("wss://", "ws://")
 
             self._server_status["wss-uri"] = public_uri or local_uri
-            self._startup_event.log_info(f"Listening for connections on {local_uri}")
+            self._startup_event.log_info(
+                f"Listening for connections on {self._server_status["wss-uri"]}"
+            )
             self._startup_event.ws_address = self._config["wss-host"]
             self._startup_event.ws_port = self._config["wss-port"]
             self._startup_event.set_ws_started(True)
