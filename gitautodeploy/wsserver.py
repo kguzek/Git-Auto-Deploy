@@ -48,9 +48,6 @@ def websocket_client_handler_factory(config, clients, event_store, server_status
             if isBinary:
                 return
 
-            if isinstance(payload, bytes):
-                payload = payload.decode("utf8")
-
             try:
                 data = json.loads(payload)
 
@@ -65,12 +62,16 @@ def websocket_client_handler_factory(config, clients, event_store, server_status
                         self.clients.append(self)
 
                         # Let the client know that they are authenticated
-                        self.sendMessage(json.dumps({"type": "authenticated"}))
+                        self.sendMessage(
+                            json.dumps({"type": "authenticated"}).encode("utf-8")
+                        )
                         return
 
                     self.logger.error("Recieved bad auth key.")
 
-                    self.sendMessage(json.dumps({"type": "bad-auth-key"}))
+                    self.sendMessage(
+                        json.dumps({"type": "bad-auth-key"}).encode("utf-8")
+                    )
                     return
 
             except Exception as e:
