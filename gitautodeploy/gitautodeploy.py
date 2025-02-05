@@ -18,7 +18,7 @@ from .events import SystemEvent, EventStore, StartupEvent
 from .lock import Lock
 from .wrappers import GitWrapper, ProcessWrapper
 
-from .wsserver import WebSocketClientHandlerFactory
+from .wsserver import websocket_client_handler_factory
 from .httpserver import webhook_request_handler_factory
 
 from .cli.config import get_config_defaults, get_config_from_environment
@@ -476,7 +476,7 @@ class GitAutoDeploy:
             from twisted.internet.error import BindError
 
             # Create a WebSocketClientHandler instance
-            WebSocketClientHandler = WebSocketClientHandlerFactory(
+            WebSocketClientHandler = websocket_client_handler_factory(
                 self._config, self._ws_clients, self._event_store, self._server_status
             )
 
