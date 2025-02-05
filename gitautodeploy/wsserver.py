@@ -48,6 +48,9 @@ def websocket_client_handler_factory(config, clients, event_store, server_status
             if isBinary:
                 return
 
+            if isinstance(payload, bytes):
+                payload = payload.decode("utf8")
+
             try:
                 data = json.loads(payload)
 
