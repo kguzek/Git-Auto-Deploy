@@ -46,6 +46,7 @@ def get_config_defaults():
     config["http-enabled"] = True
     config["http-host"] = "0.0.0.0"
     config["http-port"] = 8001
+    config["http-public-uri"] = None
 
     # HTTPS server options
     config["https-enabled"] = True
