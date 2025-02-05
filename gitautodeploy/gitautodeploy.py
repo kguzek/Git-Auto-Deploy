@@ -347,11 +347,12 @@ class GitAutoDeploy:
             # Setup SSL for HTTP server
             sa = self._http_server.socket.getsockname()
             self._http_port = sa[1]
+            http_local_uri = f"http://{self._config["http-host"]}:{sa[1]}"
             self._server_status["http-uri"] = (
-                f"http://{self._config["http-host"]}:{sa[1]}"
+                self._config["http-public-host"] or http_local_uri
             )
             self._startup_event.log_info(
-                f"Listening for connections on {self._server_status["http-uri"]}"
+                f"Listening for connections on {http_local_uri}"
             )
             self._startup_event.http_address = sa[0]
             self._startup_event.http_port = sa[1]
@@ -481,6 +482,7 @@ class GitAutoDeploy:
             )
 
             uri = f"ws://{self._config["wss-host"]}:{self._config["wss-port"]}"
+            local_uri = f"wss://{self._config["wss-host"]}:{self._config["wss-port"]}"
             factory = WebSocketServerFactory(uri)
             factory.protocol = WebSocketClientHandler
             # factory.setProtocolOptions(maxConnections=2)
@@ -507,23 +509,14 @@ class GitAutoDeploy:
                 self._ws_server_port = reactor.listenSSL(
                     self._config["wss-port"], factory, context_factory
                 )
-
-                self._server_status["wss-uri"] = (
-                    public_uri
-                    or f"wss://{self._config["wss-host"]}:{self._config["wss-port"]}"
-                )
             else:
                 self._ws_server_port = reactor.listenTCP(
                     self._config["wss-port"], factory
                 )
-                self._server_status["wss-uri"] = (
-                    public_uri
-                    or f"ws://{self._config["wss-host"]}:{self._config["wss-port"]}"
-                )
+                local_uri = local_uri.replace("wss://", "ws://")
 
-            self._startup_event.log_info(
-                f"Listening for connections on {self._server_status["wss-uri"]}"
-            )
+            self._server_status["wss-uri"] = public_uri or local_uri
+            self._startup_event.log_info(f"Listening for connections on {local_uri}")
             self._startup_event.ws_address = self._config["wss-host"]
             self._startup_event.ws_port = self._config["wss-port"]
             self._startup_event.set_ws_started(True)
