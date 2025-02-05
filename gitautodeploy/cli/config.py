@@ -59,8 +59,7 @@ def get_config_defaults():
     config["wss-host"] = "0.0.0.0"
     config["wss-port"] = 8003
     config["ws-always-ssl"] = True
-    config["ws-public-host"] = None
-    config["ws-public-port"] = None
+    config["ws-public-uri"] = None
 
     # TLS/SSL cert (necessary for HTTPS and web socket server to work)
     config["ssl-key"] = None  # If specified, holds the private key

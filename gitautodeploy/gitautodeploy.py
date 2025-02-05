@@ -484,10 +484,8 @@ class GitAutoDeploy:
             factory = WebSocketServerFactory(uri)
             factory.protocol = WebSocketClientHandler
             # factory.setProtocolOptions(maxConnections=2)
-            public_host = self._config["ws-public-host"] or self._config["wss-host"]
-            public_port = self._config["ws-public-port"] or self._config["wss-port"]
-            use_ssl = self._config["ws-always-ssl"]
-            if use_ssl:
+            public_uri = self._config["ws-public-uri"]
+            if self._config["ws-always-ssl"]:
                 if not os.path.isfile(self._config["ssl-cert"]):
                     self._startup_event.log_critical(
                         f"Unable to activate SSL: File does not exist: {self._config["ssl-cert"]}"
@@ -510,12 +508,18 @@ class GitAutoDeploy:
                     self._config["wss-port"], factory, context_factory
                 )
 
-                self._server_status["wss-uri"] = f"wss://{public_host}:{public_port}"
+                self._server_status["wss-uri"] = (
+                    public_uri
+                    or f"wss://{self._config["wss-host"]}:{self._config["wss-port"]}"
+                )
             else:
                 self._ws_server_port = reactor.listenTCP(
                     self._config["wss-port"], factory
                 )
-                self._server_status["wss-uri"] = f"ws://{public_host}:{public_port}"
+                self._server_status["wss-uri"] = (
+                    public_uri
+                    or f"ws://{self._config["wss-host"]}:{self._config["wss-port"]}"
+                )
 
             self._startup_event.log_info(
                 f"Listening for connections on {self._server_status["wss-uri"]}"
