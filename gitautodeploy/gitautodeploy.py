@@ -349,7 +349,7 @@ class GitAutoDeploy:
             self._http_port = sa[1]
             http_local_uri = f"http://{self._config["http-host"]}:{sa[1]}"
             self._server_status["http-uri"] = (
-                self._config["http-public-host"] or http_local_uri
+                self._config["http-public-uri"] or http_local_uri
             )
             self._startup_event.log_info(
                 f"Listening for connections on {http_local_uri}"
