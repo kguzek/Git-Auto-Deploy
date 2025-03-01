@@ -526,9 +526,10 @@ class GitAutoDeploy:
             # Serve forever (until reactor.stop())
             reactor.run(installSignalHandlers=False)
 
-        except ImportError:
+        except ImportError as import_error:
             self._startup_event.log_error(
-                "Unable to start web socket server due to missing dependency."
+                "Unable to start web socket server due to missing dependency: "
+                + import_error.msg
             )
 
         except BindError as e:
@@ -580,20 +581,24 @@ class GitAutoDeploy:
         event = SystemEvent()
         self._event_store.register_action(event)
 
-        # Reload configuration on SIGHUP events (conventional for daemon processes)
-        if signum == 1:
-            self.setup(self._config)
-            self.serve_forever()
-            return
-
-        # Keyboard interrupt signal
-        if signum == 2:
-            event.log_info(
-                f"Recieved keyboard interrupt signal ({signum}) from the OS, shutting down."
-            )
-
-        else:
-            event.log_info(f"Recieved signal ({signum}) from the OS, shutting down.")
+        match signum:
+            case signal.SIGHUP:
+                # Reload configuration on SIGHUP events (conventional for daemon processes)
+                self.setup(self._config)
+                self.serve_forever()
+                return
+            case signal.SIGINT:
+                event.log_info(
+                    f"Recieved keyboard interrupt signal ({signum}) from the OS, shutting down."
+                )
+            case signal.SIGTERM:
+                event.log_info(
+                    f"Received termination signal ({signum}) from the OS, shutting down."
+                )
+            case _:
+                event.log_info(
+                    f"Recieved signal ({signum}) from the OS, shutting down."
+                )
 
         self.exit()
 
@@ -656,6 +661,8 @@ def main():
         signal.signal(signal.SIGINT, app.signal_handler)
     if hasattr(signal, "SIGABRT"):
         signal.signal(signal.SIGABRT, app.signal_handler)
+    if hasattr(signal, "SIGTERM"):
+        signal.signal(signal.SIGTERM, app.signal_handler)
     if hasattr(signal, "SIGPIPE") and hasattr(signal, "SIG_IGN"):
         signal.signal(signal.SIGPIPE, signal.SIG_IGN)
 
