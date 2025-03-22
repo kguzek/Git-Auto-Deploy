@@ -1,12 +1,11 @@
 """Configuration handling for GitAutoDeploy."""
 
-import logging
 import argparse
+import errno
+import json
+import logging
 import os
 import re
-import json
-import errno
-
 
 try:
     from ..models import Project
@@ -417,7 +416,7 @@ def init_config(config):
             repo_config["deploy_commands"].insert(0, config["global_deploy"][0])
 
         # Check if any repo specific deploy command is specified
-        if "deploy" in repo_config:
+        if "deploy" in repo_config and len(repo_config["deploy"]) > 0:
             repo_config["deploy_commands"].append(repo_config["deploy"])
 
         # Check if any global post deploy command is specified

@@ -1,4 +1,10 @@
-class ProcessWrapper():
+"""Process wrapper module for gitautodeploy."""
+
+import logging
+from subprocess import PIPE, Popen
+
+
+class ProcessWrapper:
     """Wraps the subprocess popen method and provides logging."""
 
     def __init__(self):
@@ -10,17 +16,15 @@ class ProcessWrapper():
         output to logging module. The arguments are the same as for the Popen
         constructor."""
 
-        from subprocess import Popen, PIPE
-        import logging
         logger = logging.getLogger()
 
-        kwargs['stdout'] = PIPE
-        kwargs['stderr'] = PIPE
+        kwargs["stdout"] = PIPE
+        kwargs["stderr"] = PIPE
 
-        supressStderr = None
-        if 'supressStderr' in kwargs:
-            supressStderr = kwargs['supressStderr']
-            del kwargs['supressStderr']
+        suppress_stderr = None
+        if "supressStderr" in kwargs:
+            suppress_stderr = kwargs["supressStderr"]
+            del kwargs["supressStderr"]
 
         p = Popen(*popenargs, **kwargs)
         stdout, stderr = p.communicate()
@@ -35,7 +39,7 @@ class ProcessWrapper():
 
         if stderr:
             for line in stderr.strip().split("\n"):
-                if supressStderr:
+                if suppress_stderr:
                     logger.info(line)
                 else:
                     logger.error(line)
