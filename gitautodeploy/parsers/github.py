@@ -21,11 +21,13 @@ class GitHubRequestParser(WebhookRequestParserBase):
             "x-github-event" in request_headers and request_headers["x-github-event"]
         )
 
-        action.log_info(f"Received '{github_event}' event from GitHub")
-
         if "repository" not in data:
             action.log_error("Unable to recognize data format")
             return []
+
+        action.log_info(
+            f"Received '{github_event}' event from GitHub ({data["repository"]["full_name"]})"
+        )
 
         # One repository may posses multiple URLs for different protocols
         for k in ["url", "git_url", "clone_url", "ssh_url"]:

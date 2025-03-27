@@ -7,6 +7,7 @@ from .github import GitHubRequestParser
 from .gitlab import GitLabRequestParser
 from .gitlabci import GitLabCIRequestParser
 from .generic import GenericRequestParser
+from .harbor import HarborRequestParser
 from .coding import CodingRequestParser
 
 
@@ -45,6 +46,14 @@ def get_service_handler(request_headers, request_body, action, config):
     # 'Bitbucket-Webhooks/2.0' (or something similar)
     if user_agent and user_agent.lower().find("bitbucket") != -1:
         return BitBucketRequestParser(config)
+
+    # Harbor Docker Container Registry webhooks
+    if (
+        isinstance(payload, dict)
+        and "type" in payload
+        and payload["type"] == "PUSH_ARTIFACT"
+    ):
+        return HarborRequestParser(config)
 
     # This handles old GitLab requests and Gogs requests for example.
     if content_type == "application/json":
