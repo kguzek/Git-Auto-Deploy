@@ -42,7 +42,10 @@ class HarborRequestParser(WebhookRequestParserBase):
             action.log_error("Invalid webhook request data format")
             return []
 
-        action.log_info(f"Received '{data["event_type"]}' event from Harbor")
+        action.log_info(
+            f"Received '{data["type"]}' event from Harbor for "
+            f"repo '{data["event_data"]["repository"]["repo_full_name"]}'"
+        )
 
         # Get a list of configured repositories that matches the incoming web hook reqeust
         match_url = data["event_data"]["resources"][0]["resource_url"].split("@")[0]
