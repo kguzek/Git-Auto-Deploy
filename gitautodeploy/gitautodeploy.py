@@ -131,6 +131,12 @@ class GitAutoDeploy:
                 )
                 continue
 
+            if repo_config.get("skip-init"):
+                logger.debug(
+                    "Skipping repository %s (skip-init option)", repo_config["url"]
+                )
+                continue
+
             if os.path.isdir(repo_config["path"]) and os.path.isdir(
                 repo_config["path"] + "/.git"
             ):

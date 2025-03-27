@@ -60,7 +60,7 @@ class HarborRequestParser(WebhookRequestParserBase):
 
             if "secret-token" not in repo_config:
                 continue
-            auth_header = request_headers.get("Authorization")
+            auth_header = request_headers.get("authorization")
             expected_auth_header = repo_config["secret-token"]
             if auth_header is None or auth_header != expected_auth_header:
                 return False
