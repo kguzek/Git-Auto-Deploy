@@ -17,7 +17,7 @@ def is_valid_webhook_request(data):
     return (
         isinstance(data, dict)
         and all(key in data for key in EVENT_KEYS)
-        and all(key in data["event_data"] for key in ("resources, repository"))
+        and all(key in data["event_data"] for key in ("resources", "repository"))
         and isinstance(data["event_data"]["resources"], list)
         and isinstance(data["event_data"]["repository"], dict)
         and len(data["event_data"]["resources"]) > 0
