@@ -59,6 +59,8 @@ target/
 
 GitAutoDeploy.conf.json
 config.json
+config.json5
+.gitautodeploy.pid
 *.tc.json
 
 .idea
