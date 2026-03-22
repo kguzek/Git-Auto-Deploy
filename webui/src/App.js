@@ -1,11 +1,11 @@
-import React, { Component } from 'react';
-import './App.scss';
-import Timeline from './Timeline';
-import Navigation from './Navigation';
+import React, { Component } from "react";
+import "./App.scss";
+import Timeline from "./Timeline";
+import Navigation from "./Navigation";
 
 class App extends Component {
   render() {
-/*
+    /*
     if(window.location.protocol !== "https:" && process.env.NODE_ENV !== 'development') {
       return (
         <div className="App">

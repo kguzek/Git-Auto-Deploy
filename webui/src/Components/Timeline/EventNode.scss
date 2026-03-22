@@ -1,273 +1,270 @@
-@import '../../variables';
+@import "../../variables";
 
 .EventNode {
-    $container-width: 46%;
-    $timeline-width: 100% - $container-width * 2;
+  $container-width: 46%;
+  $timeline-width: 100% - $container-width * 2;
 
-    $circle-vertical-distance: 2rem;
+  $circle-vertical-distance: 2rem;
 
-    $timeline-icon-border: $line-thickness;
-    $timeline-icon-radius: $line-thickness * 2;
+  $timeline-icon-border: $line-thickness;
+  $timeline-icon-radius: $line-thickness * 2;
 
+  position: relative;
+  padding: 0 1rem 1rem 1rem;
+  @media screen and (min-width: $tablet-min-width) {
+    padding: 0;
+  }
+
+  .inner {
     position: relative;
-    padding: 0 1rem 1rem 1rem;
-    @media screen and (min-width : $tablet-min-width) {
-        padding: 0;
+    background-color: white;
+    border-radius: 0.3rem;
+    box-shadow: 0 2px 6px 1px rgba(0, 0, 0, 0.125);
+    font-family: "Roboto", sans-serif;
+    color: #333;
+    width: 100%;
+
+    @media screen and (min-width: $mobile-min-width) {
+      width: $container-width * 2 - 9%;
     }
 
-    .inner {
-        position: relative;
-        background-color: white;
-        border-radius: .3rem;
-        box-shadow: 0 2px 6px 1px rgba(0, 0, 0, 0.125);
-        font-family: 'Roboto', sans-serif;
-        color: #333;
-        width: 100%;
-
-        @media screen and (min-width : $mobile-min-width) {
-            width: $container-width * 2 - 9%;
-        }
-
-        @media screen and (min-width : $tablet-min-width) {
-            width: $container-width;
-        }
+    @media screen and (min-width: $tablet-min-width) {
+      width: $container-width;
     }
-    
-    @media screen and (min-width : $tablet-min-width) {
-        &.right {
-            .inner {
-                margin-left: $container-width + $timeline-width;
-            }
-        }
+  }
+
+  @media screen and (min-width: $tablet-min-width) {
+    &.right {
+      .inner {
+        margin-left: $container-width + $timeline-width;
+      }
+    }
+  }
+
+  .header {
+    padding: 0;
+    border-radius: 0.25rem 0.25rem 0 0;
+    position: relative;
+    //height: 4.2rem;
+
+    .icon {
+      position: absolute;
+      top: 0.25rem;
+      left: 1rem;
+      font-size: 2.75rem;
+      color: white;
     }
 
+    div.icon {
+      top: 50%;
+      margin-top: calc(-15px);
+      left: 1.5rem;
+    }
+
+    p.title,
+    p.subtitle {
+      margin: 0;
+      font-family: "Lato", sans-serif;
+      color: white;
+    }
+
+    p.title {
+      position: absolute;
+      left: 4.5rem;
+      margin: 0;
+      font-family: "Lato", sans-serif;
+      color: white;
+      top: 0.5rem;
+      text-transform: uppercase;
+      font-size: 1.5rem;
+      font-weight: 300;
+    }
+
+    p.subtitle {
+      font-size: 1rem;
+      font-weight: 400;
+      padding-left: 4.5rem;
+      padding-top: 2.2rem;
+      padding-bottom: 0.6rem;
+    }
+  }
+
+  &.blue {
     .header {
-        padding: 0;
-        border-radius: .25rem .25rem 0 0;
-        position: relative;
-        //height: 4.2rem;
+      background-color: $color-blue;
+    }
+  }
 
-        .icon {
-            position: absolute;
-            top: .25rem;
-            left: 1rem;
-            font-size: 2.75rem;
-            color: white;
-        }
+  &.green {
+    .header {
+      background-color: $color-green;
+    }
+  }
 
-        div.icon {
-            top: 50%;
-            margin-top: calc(-15px);
-            left: 1.5rem;
-        }
+  &.purple {
+    .header {
+      background-color: $color-purple;
+    }
+  }
 
-        p.title,
-        p.subtitle {
-            margin: 0;
-            font-family: 'Lato', sans-serif;
-            color: white;
-        }
+  .body {
+    padding: 0.75rem 1.5rem;
+  }
 
-        p.title {
-            position: absolute;
-            left: 4.5rem;
-            margin: 0;
-            font-family: 'Lato', sans-serif;
-            color: white;
-            top: .5rem;
-            text-transform: uppercase;
-            font-size: 1.5rem;
-            font-weight: 300;
-        }
+  $relative-timeline-spacing: $timeline-width / $container-width / 2 * 100%;
+  $icon-position: -1 * $relative-timeline-spacing;
 
-        p.subtitle {
-            font-size: 1rem;
-            font-weight: 400;
-            padding-left: 4.5rem;
-            padding-top: 2.2rem;
-            padding-bottom: .6rem;
-        }
+  // Vertical line
+  .vertical-line {
+    position: absolute;
+    top: $circle-vertical-distance;
+    margin-top: -1 * $line-thickness / 2;
+    width: $relative-timeline-spacing;
+    height: $line-thickness;
+    background-color: $color-blue-gray;
+    content: " ";
+  }
+
+  &.right .vertical-line {
+    left: -1 * $relative-timeline-spacing;
+    right: auto;
+  }
+
+  &.left .vertical-line {
+    left: auto;
+    right: -1 * $relative-timeline-spacing;
+  }
+
+  // Horizontal line
+  .horizontal-line {
+    position: absolute;
+    top: 0;
+    width: $line-thickness;
+    height: 100%;
+    background-color: $color-blue-gray;
+    content: " ";
+    left: calc(92% - #{$line-thickness / 2});
+
+    display: none;
+    @media screen and (min-width: $mobile-min-width) {
+      display: block;
     }
 
-    &.blue {
-        .header {
-            background-color: $color-blue;
-        }
+    @media screen and (min-width: $tablet-min-width) {
+      left: calc(50% - #{$line-thickness / 2});
     }
+  }
 
-    &.green {
-        .header {
-            background-color: $color-green;
-        }
+  // Circular mark
+  .timeline-icon {
+    position: absolute;
+    top: calc(#{$circle-vertical-distance} - #{$timeline-icon-border});
+    margin-top: -1 * $timeline-icon-radius;
+    width: $timeline-icon-radius * 2;
+    height: $timeline-icon-radius * 2;
+    border-radius: $timeline-icon-radius * 4;
+    background-color: #46cbde;
+    border: $timeline-icon-border solid $body-background;
+    left: 50%;
+    right: auto;
+    margin-left: -1 * ($timeline-icon-radius + $line-thickness);
+    display: none;
+    @media screen and (min-width: $mobile-min-width) {
+      display: block;
     }
+  }
 
-    &.purple {
-        .header {
-            background-color: $color-purple;
-        }
-    }
-
-    .body {
-        padding: .75rem 1.5rem;
-    }
-
-    $relative-timeline-spacing: $timeline-width / $container-width / 2 * 100%;
-    $icon-position: -1 * $relative-timeline-spacing;
-
-    // Vertical line
-    .vertical-line {
-        position: absolute;
-        top: $circle-vertical-distance;
-        margin-top: -1 * $line-thickness / 2;
-        width: $relative-timeline-spacing;
-        height: $line-thickness;
-        background-color: $color-blue-gray;
-        content: ' ';
-    }
-
-    &.right .vertical-line {
-        left: -1 * $relative-timeline-spacing;
-        right: auto;
-    }
-
-    &.left .vertical-line {
-        left: auto;
-        right: -1 * $relative-timeline-spacing;
-    }
-
-    // Horizontal line
-    .horizontal-line {
-        position: absolute;
-        top: 0;
-        width: $line-thickness;
-        height: 100%;
-        background-color: $color-blue-gray;
-        content: ' ';
-        left: calc(92% - #{$line-thickness / 2});
-
-        display: none;
-        @media screen and (min-width : $mobile-min-width) {
-            display: block;
-        }
-
-        @media screen and (min-width : $tablet-min-width) {
-            left: calc(50% - #{$line-thickness / 2});
-        }
-    }
-
-    // Circular mark
+  &.blue {
     .timeline-icon {
-        position: absolute;
-        top: calc(#{$circle-vertical-distance} - #{$timeline-icon-border});
-        margin-top: -1 * $timeline-icon-radius;
-        width: $timeline-icon-radius * 2;
-        height: $timeline-icon-radius * 2;
-        border-radius: $timeline-icon-radius * 4;
-        background-color: #46cbde;
-        border: $timeline-icon-border solid $body-background;
-        left: 50%;
-        right: auto;
-        margin-left: -1 * ($timeline-icon-radius + $line-thickness);
-        display: none;
-        @media screen and (min-width : $mobile-min-width) {
-            display: block;
-        }
+      background-color: $color-blue;
     }
+  }
 
-    &.blue {
-        .timeline-icon {
-            background-color: $color-blue;
-        }
+  &.green {
+    .timeline-icon {
+      background-color: $color-green;
     }
+  }
 
-    &.green {
-        .timeline-icon {
-            background-color: $color-green;
-        }
+  &.purple {
+    .timeline-icon {
+      background-color: $color-purple;
     }
+  }
 
-    &.purple {
-        .timeline-icon {
-            background-color: $color-purple;
-        }
+  $arrow-width: 0.7rem;
+  $arrow-height: $arrow-width * 3;
+
+  .vertical-arrow {
+    position: absolute;
+    top: $circle-vertical-distance;
+    width: $arrow-width;
+    height: $arrow-height;
+    margin-top: -1 * $arrow-height / 2;
+    display: none;
+
+    @media screen and (min-width: $mobile-min-width) {
+      display: block;
     }
+  }
 
-    $arrow-width: .7rem;
-    $arrow-height: $arrow-width * 3;
-
+  &.blue {
     .vertical-arrow {
-        position: absolute;
-        top: $circle-vertical-distance;
-        width: $arrow-width;
-        height: $arrow-height;
-        margin-top: -1 * $arrow-height / 2;
-        display: none;
-
-        @media screen and (min-width : $mobile-min-width) {
-            display: block;
-        }
-
+      fill: $color-blue;
     }
+  }
 
-    &.blue {
-        .vertical-arrow {
-            fill: $color-blue;
-        }
+  &.green {
+    .vertical-arrow {
+      fill: $color-green;
     }
+  }
 
-    &.green {
-        .vertical-arrow {
-            fill: $color-green;
-        }
+  &.purple {
+    .vertical-arrow {
+      fill: $color-purple;
     }
+  }
 
-    &.purple {
-        .vertical-arrow {
-            fill: $color-purple;
-        }
-    }
-    
+  &.left .vertical-arrow,
+  &.right .vertical-arrow {
+    left: auto;
+    right: -1 * $arrow-width;
+  }
 
-    &.left .vertical-arrow,
+  @media screen and (min-width: $tablet-min-width) {
     &.right .vertical-arrow {
-        left: auto;
-        right: -1 * $arrow-width;
+      left: -1 * $arrow-width;
+      right: auto;
+      transform: rotate(180deg);
     }
+  }
 
-    @media screen and (min-width : $tablet-min-width) {
-        &.right .vertical-arrow{
-            left: -1 * $arrow-width;
-            right: auto;
-            transform: rotate(180deg);
-        }
-    }
+  $datetime-width: 5rem;
 
-    $datetime-width: 5rem;
+  p.datetime {
+    position: absolute;
+    width: $datetime-width;
+    top: calc(#{$circle-vertical-distance} - 0.5rem);
+    margin: 0;
+    font-size: 0.7rem;
+    line-height: 1rem;
+    color: #999;
+  }
 
-    p.datetime {
-        position: absolute;
-        width: $datetime-width;
-        top: calc(#{$circle-vertical-distance} - .5rem);
-        margin: 0;
-        font-size: .7rem;
-        line-height: 1rem;
-        color: #999;
-    }
+  &.left .datetime {
+    left: auto;
+    right: calc(-1 * #{$relative-timeline-spacing} * 2 - #{$datetime-width});
+    text-align: left;
+  }
 
-    &.left .datetime {
-        left: auto;
-        right: calc(-1 * #{$relative-timeline-spacing} * 2 - #{$datetime-width});
-        text-align: left;
-    }
+  &.right .datetime {
+    left: calc(-1 * #{$relative-timeline-spacing} * 2 - #{$datetime-width});
+    right: auto;
+    text-align: right;
+  }
 
-    &.right .datetime {
-        left: calc(-1 * #{$relative-timeline-spacing} * 2 - #{$datetime-width});
-        right: auto;
-        text-align: right;
-    }
-
-
-    /*
+  /*
     &.left .datetime {
         //left: auto;
         //right: -7rem;
@@ -288,7 +285,7 @@
         }
     }
     */
-/*
+  /*
 
     p.datetime .date,
     p.datetime .time {
@@ -406,39 +403,48 @@
         bottom: 0;
     }*/
 
+  $spinner-size: 30px;
+  $spinner-color: white;
 
+  .spinner {
+    width: $spinner-size;
+    height: $spinner-size;
+    background-color: $spinner-color;
 
+    margin: 100px auto;
+    -webkit-animation: sk-rotateplane 1.2s infinite ease-in-out;
+    animation: sk-rotateplane 1.2s infinite ease-in-out;
+  }
 
-
-    $spinner-size: 30px;
-    $spinner-color: white;
-
-    .spinner {
-        width: $spinner-size;
-        height: $spinner-size;
-        background-color: $spinner-color;
-
-        margin: 100px auto;
-        -webkit-animation: sk-rotateplane 1.2s infinite ease-in-out;
-        animation: sk-rotateplane 1.2s infinite ease-in-out;
+  @-webkit-keyframes sk-rotateplane {
+    0% {
+      -webkit-transform: perspective($spinner-size * 3);
     }
-
-    @-webkit-keyframes sk-rotateplane {
-        0% { -webkit-transform: perspective($spinner-size*3) }
-        50% { -webkit-transform: perspective($spinner-size*3) rotateY(180deg) }
-        100% { -webkit-transform: perspective($spinner-size*3) rotateY(180deg)  rotateX(180deg) }
+    50% {
+      -webkit-transform: perspective($spinner-size * 3) rotateY(180deg);
     }
-
-    @keyframes sk-rotateplane {
-        0% { 
-            transform: perspective($spinner-size*3) rotateX(0deg) rotateY(0deg);
-            -webkit-transform: perspective($spinner-size*3) rotateX(0deg) rotateY(0deg) 
-        } 50% { 
-            transform: perspective($spinner-size*3) rotateX(-180.1deg) rotateY(0deg);
-            -webkit-transform: perspective($spinner-size*3) rotateX(-180.1deg) rotateY(0deg) 
-        } 100% { 
-            transform: perspective($spinner-size*3) rotateX(-180deg) rotateY(-179.9deg);
-            -webkit-transform: perspective($spinner-size*3) rotateX(-180deg) rotateY(-179.9deg);
-        }
+    100% {
+      -webkit-transform: perspective($spinner-size * 3) rotateY(180deg)
+        rotateX(180deg);
     }
+  }
+
+  @keyframes sk-rotateplane {
+    0% {
+      transform: perspective($spinner-size * 3) rotateX(0deg) rotateY(0deg);
+      -webkit-transform: perspective($spinner-size * 3) rotateX(0deg)
+        rotateY(0deg);
+    }
+    50% {
+      transform: perspective($spinner-size * 3) rotateX(-180.1deg) rotateY(0deg);
+      -webkit-transform: perspective($spinner-size * 3) rotateX(-180.1deg)
+        rotateY(0deg);
+    }
+    100% {
+      transform: perspective($spinner-size * 3) rotateX(-180deg)
+        rotateY(-179.9deg);
+      -webkit-transform: perspective($spinner-size * 3) rotateX(-180deg)
+        rotateY(-179.9deg);
+    }
+  }
 }

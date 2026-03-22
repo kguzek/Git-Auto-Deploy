@@ -1,17 +1,16 @@
-@import '../variables';
+@import "../variables";
 
 .WebSocketStatus {
+  position: fixed;
+  bottom: 1rem;
+  right: 0.3rem;
+  z-index: 1010;
 
-    position: fixed;
-    bottom: 4rem;
-    right: .3rem;
-    z-index: 1010;
+  color: #999;
+  font-size: 0.8rem;
+  font-family: "Roboto", sans-serif;
 
-    color: #999;
-    font-size: .8rem;
-    font-family: 'Roboto', sans-serif;
-
-    div {
-        display: inline;
-    }
+  div {
+    display: inline;
+  }
 }
