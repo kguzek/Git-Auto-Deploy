@@ -106,6 +106,17 @@ class Project(collections_abc.MutableMapping):
 
         payload = json.loads(request_body)
 
+        # GitHub-compatible push events include branch creations and deletions.
+        # The configured checkout branch must also restrict deployment triggers.
+        if request_headers.get('x-github-event') == 'push':
+            expected_ref = 'refs/heads/' + self['branch']
+            if payload.get('ref') != expected_ref:
+                action.log_info("Ignoring push for '%s'; expected '%s'" % (payload.get('ref'), expected_ref))
+                return False
+            if payload.get('deleted') or payload.get('after') == '0' * 40:
+                action.log_info("Ignoring deletion of '%s'" % expected_ref)
+                return False
+
         # Verify that all payload filters matches the request (if any payload filters are specified)
         if 'payload-filter' in self and not self.passes_payload_filter(payload, action):
 
@@ -208,4 +219,3 @@ class Project(collections_abc.MutableMapping):
         event.log_info("Deploy commands were executed")
         event.set_waiting(False)
         event.set_success(True)
-
